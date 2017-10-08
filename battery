@@ -8,6 +8,7 @@ battery usage:
     -t            output tmux status bar format
     -z            output zsh prompt format
     -e            don't output the emoji
+    -G            show the graph
     -a            output ascii instead of spark
     -b            battery path            default: /sys/class/power_supply/BAT0
     -p            use pmset (more accurate)
@@ -28,6 +29,7 @@ setDefaults() {
     pmset_on=0
     output_tmux=0
     output_zsh=0
+    show_graph=0
     ascii=0
     ascii_bar='=========='
     emoji=1
@@ -76,7 +78,7 @@ battery_charge() {
             ;;
         "Linux")
             case $(cat /etc/*-release) in
-                *"Arch Linux"*|*"Ubuntu"*|*"openSUSE"*)
+                *"Arch Linux"*|*"Ubuntu"*)
                     battery_state=$(cat $battery_path/energy_now)
                     battery_full=$battery_path/energy_full
                     battery_current=$battery_path/energy_now
@@ -136,37 +138,39 @@ apply_colors() {
 # Print the battery status
 print_status() {
     if ((emoji)) && ((BATT_CONNECTED)); then
-        GRAPH="⚡"
+        GRAPH="ϟ"
     else
+      if  ((show_graph)); then
         if command -v spark &>/dev/null; then
             sparks=$(spark 0 ${BATT_PCT} 100)
             GRAPH=${sparks:1:1}
         else
             ascii=1
         fi
-    fi
+      fi
 
-    if ((ascii)); then
-        barlength=${#ascii_bar}
+      if ((ascii)); then
+          barlength=${#ascii_bar}
 
-        # Battery percentage rounded to the lenght of ascii_bar
-        rounded_n=$(( $barlength * $BATT_PCT / 100 + 1))
+          # Battery percentage rounded to the lenght of ascii_bar
+          rounded_n=$(( $barlength * $BATT_PCT / 100 + 1))
 
-        # Creates the bar
-        GRAPH=$(printf "[%-${barlength}s]" "${ascii_bar:0:rounded_n}")
+          # Creates the bar
+          GRAPH=$(printf "[%-${barlength}s]" "${ascii_bar:0:rounded_n}")
+      fi
     fi
 
     if ((output_tmux)); then
-        printf "%s%s %s%s" "$COLOR" "[$BATT_PCT%]" "$GRAPH" "#[default]"
+        printf "%s%s %s%s" "$COLOR" "$BATT_PCT%" "$GRAPH" "#[default]"
     elif ((output_zsh)); then
-        printf "%%B%s%s %s" "$COLOR" "[$BATT_PCT%%]" "$GRAPH"
+        printf "%%B%s%s %s" "$COLOR" "$BATT_PCT%" "$GRAPH"
     else
-        printf "\e[0;%sm%s %s \e[m\n"  "$COLOR" "[$BATT_PCT%]"  "$GRAPH"
+        printf "\e[0;%sm%s %s \e[m\n"  "$COLOR" "$BATT_PCT%"  "$GRAPH"
     fi
 }
 
 # Read args
-while getopts ":g:m:w:tzeab:p" opt; do
+while getopts ":g:m:w:tzeGab:p" opt; do
     case $opt in
         g)
             good_color=$OPTARG
@@ -191,6 +195,9 @@ while getopts ":g:m:w:tzeab:p" opt; do
             ;;
         e)
             emoji=0
+            ;;
+        G)
+            show_graph=1
             ;;
         a)
             ascii=1
@@ -223,3 +230,4 @@ done
 battery_charge
 apply_colors
 print_status
+
